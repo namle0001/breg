@@ -7,8 +7,14 @@ class UIOption(StrEnum):
 
 
 class BootstrapOption:
-    USER_INTERFACE: str = None
+    USER_INTERFACE: str
 
-    PROJECT_DIR: Path = None
-    CONFIG_FILE: Path = Path("breg.conf")
-    ENV_FILE: Path = Path(".env")
+    PROJECT_DIR: Path
+    CONFIG_FILE: Path
+    ENV_FILE: Path
+
+    def __init__(self) -> None:
+        self.USER_INTERFACE = None
+        self.PROJECT_DIR = None
+        self.CONFIG_FILE = Path("breg.conf")
+        self.ENV_FILE = Path(".env")

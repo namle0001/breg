@@ -8,9 +8,9 @@ from ctypes import (
     pointer,
 )
 from datetime import datetime
-from typing import Any
+from enum import StrEnum
 
-from breg.type.api_internal import EnrollmentID
+from breg.type.api_internal import EnrollmentID, ClassID
 
 
 class Enrollment:
@@ -30,24 +30,29 @@ class Enrollment:
 
 
 class ClassCache:
+    cache_id: int
     timestamp: datetime
     course_code: str
     class_code: str
-    class_id: str
+    class_id: ClassID
     student_no: int
     student_capacity: int
     schedules: list["Schedule"]
+    last_checked: datetime
 
     def __init__(
         self,
+        cache_id: int = None,
         timestamp: datetime = None,
         course_code: str = None,
         class_code: str = None,
-        class_id: str = None,
+        class_id: ClassID = None,
         student_no: int = None,
         student_capacity: int = None,
         schedules: list["Schedule"] = None,
+        last_checked: datetime = None,
     ):
+        self.cache_id = cache_id
         self.timestamp = timestamp if timestamp is not None else datetime.now()
         self.course_code = course_code
         self.class_code = class_code
@@ -55,9 +60,25 @@ class ClassCache:
         self.student_no = student_no
         self.student_capacity = student_capacity
         self.schedules = schedules if schedules is not None else []
+        self.last_checked = last_checked if last_checked is not None else datetime.now()
+
+    @classmethod
+    def fields(cls) -> list[str]:
+        return [
+            "cache_id",
+            "timestamp",
+            "course_code",
+            "class_code",
+            "class_id",
+            "student_no",
+            "student_capacity",
+            "schedules",
+            "last_checked",
+        ]
 
 
 class Schedule:
+    schedule_id: int
     day: "DayBF"
     timeframe: "TimeframeBF"
     week: "WeekBF"
@@ -65,11 +86,13 @@ class Schedule:
 
     def __init__(
         self,
+        schedule_id: int = None,
         day: "DayBF" = None,
         timeframe: "TimeframeBF" = None,
         week: "WeekBF" = None,
         location: str = None,
     ):
+        self.schedule_id = schedule_id
         self.day = day
         self.timeframe = timeframe
         self.week = week
@@ -84,24 +107,129 @@ class Schedule:
             return False
         return True
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Schedule):
+            return NotImplemented
+
+        return (
+            self.schedule_id == other.schedule_id
+            and self.location == other.location
+            and self.day == other.day
+            and self.timeframe == other.timeframe
+            and self.week == other.week
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.schedule_id,
+                self.location,
+                self.day,
+                self.timeframe,
+                self.week,
+            )
+        )
+
+    def dict(self) -> "dict":
+        return {
+            "schedule_id": self.schedule_id,
+            "day": self.day.value(),
+            "timeframe": self.timeframe.value(),
+            "week": self.week.value(),
+            "location": self.location,
+        }
+
+    @classmethod
+    def from_dict(cls, data: "dict") -> "Schedule":
+        return cls(
+            schedule_id=data.get("schedule_id"),
+            day=DayBF.from_int(data.get("day", 0)),
+            timeframe=TimeframeBF.from_int(data.get("timeframe", 0)),
+            week=WeekBF.from_int(data.get("week", 0)),
+            location=data.get("location"),
+        )
+
+    @classmethod
+    def fields(cls) -> list[str]:
+        return [
+            "schedule_id",
+            "day",
+            "timeframe",
+            "week",
+            "location",
+        ]
+
+
+class LogicalSchedule(Schedule):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, LogicalSchedule):
+            return NotImplemented
+        return (
+            self.location == other.location
+            and self.day == other.day
+            and self.timeframe == other.timeframe
+            and self.week == other.week
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.location,
+                self.day,
+                self.timeframe,
+                self.week,
+            )
+        )
+
+    @classmethod
+    def from_schedule(cls, schedule: Schedule) -> "LogicalSchedule":
+        return cls(
+            schedule_id=schedule.schedule_id,
+            day=schedule.day,
+            timeframe=schedule.timeframe,
+            week=schedule.week,
+            location=schedule.location,
+        )
+
+    @classmethod
+    def from_schedules(cls, schedules: list[Schedule]) -> list["LogicalSchedule"]:
+        return [cls.from_schedule(schedule) for schedule in schedules]
+
 
 class CourseCache:
+    cache_id: int
     timestamp: datetime
     course_code: str
     course_name: str
     course_id: str
+    last_checked: datetime
 
     def __init__(
         self,
+        cache_id: int = None,
         timestamp: datetime = None,
         course_code: str = None,
         course_name: str = None,
         course_id: str = None,
+        last_checked: datetime = None,
     ):
+        self.cache_id = cache_id
         self.timestamp = timestamp if timestamp is not None else datetime.now()
         self.course_code = course_code
         self.course_name = course_name
         self.course_id = course_id
+        self.last_checked = last_checked if last_checked is not None else datetime.now()
+
+    @classmethod
+    def fields(cls) -> list[str]:
+        return [
+            "cache_id",
+            "timestamp",
+            "course_code",
+            "course_name",
+            "course_id",
+            "last_checked",
+        ]
 
 
 class DayBF(Structure):
@@ -116,25 +244,59 @@ class DayBF(Structure):
         ("reserved", c_uint8, 1),
     ]
 
-    def value(self) -> Any:
-        return cast(pointer(self), POINTER(c_uint8)).contents.value
+    def value(self) -> int:
+        return (
+            cast(pointer(self), POINTER(c_uint8)).contents.value & 0x7F
+        )  # Mask out reserved bit
 
-    def __and__(self, other: "DayBF") -> c_uint8:
-        return self.value() & other.value() & 0x7F  # Mask out reserved bit
+    def get(self, day: "Day | int | str") -> int:
+        if isinstance(day, Day):
+            day_str = day.value
+        elif isinstance(day, int):
+            day_str = Day.from_int(day - 1).value
+        elif isinstance(day, str):
+            day_str = day.lower()
+        else:
+            raise ValueError("Invalid day type")
 
-    def __or__(self, other: "DayBF") -> c_uint8:
-        return self.value() | other.value() & 0x7F  # Mask out reserved bit
+        if day_str in ("mon", "tue", "wed", "thu", "fri", "sat", "sun"):
+            return getattr(self, day_str)
+        raise ValueError(f"Invalid day string: {day_str}")
 
-    def __xor__(self, other: "DayBF") -> c_uint8:
-        return self.value() ^ other.value() & 0x7F  # Mask out reserved bit
+    def __and__(self, other: "DayBF") -> int:
+        return self.value() & other.value()
+
+    def __or__(self, other: "DayBF") -> int:
+        return self.value() | other.value()
+
+    def __xor__(self, other: "DayBF") -> int:
+        return self.value() ^ other.value()
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, DayBF):
+            return NotImplemented
+        return self.value() == other.value()
+
+    def __hash__(self) -> int:
+        return hash(self.value())
 
     @classmethod
     def from_int(cls, value: int) -> "DayBF":
         instance = cls()
-        cast(pointer(instance), POINTER(c_uint8)).contents.value = (
-            value & 0x7F
-        )  # Mask out reserved bit
+        # Mask out reserved bit
+        cast(pointer(instance), POINTER(c_uint8)).contents.value = value & 0x7F
         return instance
+
+    def dict(self) -> "dict[str, int]":
+        d = {}
+        for f in self._fields_[:-1]:  # Exclude reserved
+            field_name = f[0]
+            field_value = getattr(self, field_name)
+            d[field_name] = field_value
+        return d
+
+    def list(self) -> "list[int]":
+        return [getattr(self, f[0]) for f in self._fields_[:-1]]  # Exclude reserved
 
 
 class TimeframeBF(Structure):
@@ -157,17 +319,30 @@ class TimeframeBF(Structure):
         ("period_16", c_uint16, 1),
     ]
 
-    def value(self) -> Any:
+    def value(self) -> int:
         return cast(pointer(self), POINTER(c_uint16)).contents.value
 
-    def __and__(self, other: "TimeframeBF") -> c_uint16:
+    def get(self, period: int) -> int:
+        if 1 <= period <= 16:
+            return getattr(self, f"period_{period}")
+        raise ValueError("Period must be between 1 and 16")
+
+    def __and__(self, other: "TimeframeBF") -> int:
         return self.value() & other.value()
 
-    def __or__(self, other: "TimeframeBF") -> c_uint16:
+    def __or__(self, other: "TimeframeBF") -> int:
         return self.value() | other.value()
 
-    def __xor__(self, other: "TimeframeBF") -> c_uint16:
+    def __xor__(self, other: "TimeframeBF") -> int:
         return self.value() ^ other.value()
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TimeframeBF):
+            return NotImplemented
+        return self.value() == other.value()
+
+    def __hash__(self) -> int:
+        return hash(self.value())
 
     @classmethod
     def from_int(cls, value: int) -> "TimeframeBF":
@@ -187,6 +362,17 @@ class TimeframeBF(Structure):
                 setattr(timeframe_bf, f"period_{period_int}", 1)
 
         return timeframe_bf
+
+    def dict(self) -> "dict[str, int]":
+        d = {}
+        for f in self._fields_:
+            field_name = f[0]
+            field_value = getattr(self, field_name)
+            d[field_name] = field_value
+        return d
+
+    def list(self) -> "list[int]":
+        return [getattr(self, f[0]) for f in self._fields_]
 
 
 class WeekBF(Structure):
@@ -257,17 +443,30 @@ class WeekBF(Structure):
         ("week_64", c_uint64, 1),
     ]
 
-    def value(self) -> Any:
+    def value(self) -> int:
         return cast(pointer(self), POINTER(c_uint64)).contents.value
 
-    def __and__(self, other: "WeekBF") -> c_uint64:
+    def get(self, week: int) -> int:
+        if 1 <= week <= 64:
+            return getattr(self, f"week_{week}")
+        raise ValueError("Week must be between 1 and 64")
+
+    def __and__(self, other: "WeekBF") -> int:
         return self.value() & other.value()
 
-    def __or__(self, other: "WeekBF") -> c_uint64:
+    def __or__(self, other: "WeekBF") -> int:
         return self.value() | other.value()
 
-    def __xor__(self, other: "WeekBF") -> c_uint64:
+    def __xor__(self, other: "WeekBF") -> int:
         return self.value() ^ other.value()
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, WeekBF):
+            return NotImplemented
+        return self.value() == other.value()
+
+    def __hash__(self) -> int:
+        return hash(self.value())
 
     @classmethod
     def from_int(cls, value: int) -> "WeekBF":
@@ -286,3 +485,58 @@ class WeekBF(Structure):
             week += 1
 
         return week_bf
+
+    def dict(self) -> "dict[str, int]":
+        d = {}
+        for f in self._fields_:
+            field_name = f[0]
+            field_value = getattr(self, field_name)
+            d[field_name] = field_value
+        return d
+
+    def list(self) -> "list[int]":
+        return [getattr(self, f[0]) for f in self._fields_]
+
+
+class Day(StrEnum):
+    MONDAY = "mon"
+    TUESDAY = "tue"
+    WEDNESDAY = "wed"
+    THURSDAY = "thu"
+    FRIDAY = "fri"
+    SATURDAY = "sat"
+    SUNDAY = "sun"
+
+    __day_map: dict[int, "Day"]
+
+    @classmethod
+    def from_str(cls, day_str: str) -> "Day":
+        day_str = day_str.lower()
+        for day in cls:
+            if day.value == day_str:
+                return day
+        raise ValueError(f"Invalid day string: {day_str}")
+
+    @classmethod
+    def __day_map(cls):
+        return {
+            0: Day.MONDAY,
+            1: Day.TUESDAY,
+            2: Day.WEDNESDAY,
+            3: Day.THURSDAY,
+            4: Day.FRIDAY,
+            5: Day.SATURDAY,
+            6: Day.SUNDAY,
+        }
+
+    @classmethod
+    def from_int(cls, value: int) -> "Day":
+        if value in cls.__day_map():
+            return cls.__day_map()[value]
+        raise ValueError(f"Invalid day integer: {value}")
+
+    def to_int(self) -> int:
+        for key, val in self.__day_map().items():
+            if val == self:
+                return key
+        raise ValueError(f"Invalid day enum: {self}")

@@ -1,16 +1,14 @@
-from enum import StrEnum
-
-from http.client import HTTPConnection, HTTPResponse, HTTPSConnection
 from typing import Any
 from urllib.parse import urlencode
 
+from requests import Request as LibRequest
+from requests import Session as LibSession
+
+from threading import Lock
+
 from breg.config.config import HTTPConfiguration
 
-
-class ContentType(StrEnum):
-    FORM_URLENCODED = "application/x-www-form-urlencoded"
-    MULTIPART_FORM_DATA = "multipart/form-data"
-    JSON = "application/json"
+from .type import ContentType, LibReqResponse, Response
 
 
 class HTTP:
@@ -18,8 +16,10 @@ class HTTP:
     _headers: dict[str, Any]
     _cookies: dict[str, str]
 
-    _last_connection: HTTPConnection | HTTPSConnection = None
-    _last_response: HTTPResponse = None
+    _lock: Lock
+
+    _last_request: LibRequest
+    _last_response: Response
 
     def __init__(
         self,
@@ -31,6 +31,10 @@ class HTTP:
         self._headers = headers if headers is not None else {}
         self._cookies = cookies if cookies is not None else {}
 
+        self._lock = Lock()
+        self._last_request = None
+        self._last_response = None
+
         self.set_header("User-Agent", config.USER_AGENT)
         self.set_header("Host", config.HOSTNAME)
 
@@ -38,11 +42,12 @@ class HTTP:
         self,
         method: str,
         path: str | list[str],
-        body: bytes = None,
+        body: Any = None,
         query: dict = None,
         fragment: str = None,
         headers: dict[str, Any] = None,
-    ) -> HTTPResponse:
+        follow_redirects: bool = False,
+    ) -> Response:
         query_string: str | None = None
         fragment_string: str | None = None
         if query:
@@ -52,7 +57,7 @@ class HTTP:
 
         if isinstance(path, list):
             path = "/".join(s.strip("/") for s in path)
-        full_path = f"{path}"
+        full_path = f"{path.strip('/')}"
 
         if query_string:
             full_path += f"?{query_string}"
@@ -62,20 +67,38 @@ class HTTP:
         cp_headers = self._headers.copy()
         if headers:
             cp_headers.update(headers)
-        if self._cookies:
-            cookie_header = "; ".join(
-                f"{key}={value}" for key, value in self._cookies.items()
+
+        url = ""
+        if self._config.HTTPS:
+            url += "https://"
+        else:
+            url += "http://"
+        url += self._config.HOSTNAME
+        if self._config.PORT not in (80, 443) and self._config.PORT is not None:
+            url += f":{self._config.PORT}"
+        url += f"/{full_path}"
+
+        request = None
+        with self._lock:
+            request = LibRequest(
+                method=method,
+                url=url,
+                headers=cp_headers,
+                cookies=self._cookies,
+                data=body,
             )
-            cp_headers["Cookie"] = cookie_header
 
-        connection_class = HTTPSConnection if self._config.HTTPS else HTTPConnection
-        connection = connection_class(self._config.HOSTNAME, self._config.PORT)
+        prepared_request = request.prepare()
 
-        connection.request(method, full_path, body, cp_headers)
-        response = connection.getresponse()
+        response = None
+        with LibSession() as session:
+            response = LibReqResponse(
+                session.send(prepared_request, allow_redirects=follow_redirects)
+            )
 
-        self._last_connection = connection
-        self._last_response = response
+        with self._lock:
+            self._last_request = prepared_request
+            self._last_response = response
 
         return response
 
@@ -85,20 +108,26 @@ class HTTP:
         query: dict = None,
         fragment: str = None,
         headers: dict[str, Any] = None,
-    ) -> HTTPResponse:
+        follow_redirects: bool = False,
+    ) -> Response:
         return self.request(
-            "GET", path, query=query, fragment=fragment, headers=headers
+            "GET",
+            path,
+            query=query,
+            fragment=fragment,
+            headers=headers,
+            follow_redirects=follow_redirects,
         )
 
     def post(
         self,
         path: str | list[str],
-        body: bytes,
+        body: Any,
         query: dict = None,
         fragment: str = None,
         headers: dict[str, Any] = None,
         content_type: "ContentType" = None,
-    ) -> HTTPResponse:
+    ) -> Response:
         if content_type is not None:
             if headers is None:
                 headers = {}
@@ -110,38 +139,49 @@ class HTTP:
         )
 
     def add_header(self, key: str, value: str) -> None:
-        self._headers[key] = value
+        with self._lock:
+            self._headers[key] = value
 
     def remove_header(self, key: str) -> Any:
-        return self._headers.pop(key, None)
+        with self._lock:
+            return self._headers.pop(key, None)
 
     def get_headers(self) -> dict[str, Any]:
-        return self._headers
+        with self._lock:
+            return self._headers.copy()
 
     def get_header(self, key: str) -> str | None:
-        return self._headers.get(key)
+        with self._lock:
+            return self._headers.get(key)
 
     def set_header(self, key: str, value: str) -> None:
         self.remove_header(key)
         self.add_header(key, value)
 
     def clear_headers(self) -> None:
-        self._headers = []
+        with self._lock:
+            self._headers = {}
 
     def set_cookie(self, key: str, value: str) -> None:
-        self._cookies[key] = value
+        with self._lock:
+            self._cookies[key] = value
 
     def get_cookie(self, key: str) -> str | None:
-        return self._cookies.get(key)
+        with self._lock:
+            return self._cookies.get(key)
 
     def remove_cookie(self, key: str) -> None:
-        if key in self._cookies:
-            del self._cookies[key]
+        with self._lock:
+            if key in self._cookies:
+                del self._cookies[key]
+
+    def get_lock(self) -> Lock:
+        return self._lock
 
 
 class Session(HTTP):
     _session_token: str
-    additional_data: dict[str, Any] = {}
+    additional_data: dict[str, Any]
 
     def __init__(
         self,
@@ -151,6 +191,7 @@ class Session(HTTP):
     ):
         super().__init__(config)
         self._session_token = session_token
+        self.additional_data = {}
         if session_token:
             self.set_cookie(session_name, session_token)
 

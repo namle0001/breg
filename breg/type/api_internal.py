@@ -1,4 +1,4 @@
-class ClassCode(str):
+class ClassID(str):
     pass
 
 

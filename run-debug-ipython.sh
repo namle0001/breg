@@ -1,4 +1,4 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 export PYTHONPATH="$SCRIPT_DIR/breg:$PYTHONPATH"
 
-python "$SCRIPT_DIR/breg/main.py" "$@"
+ipython --pdb "$SCRIPT_DIR/breg/main.py" -- "$@"

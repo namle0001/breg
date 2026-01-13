@@ -1,6 +1,9 @@
 """Configuration module for the application."""
 
+from dataclasses import dataclass
 
+
+@dataclass
 class Configuration:
     """General configuration for the application."""
 
@@ -71,6 +74,14 @@ class HTTPConfiguration:
         self.PORT = PORT
         self.HTTPS = HTTPS
         self.USER_AGENT = USER_AGENT
+
+    @classmethod
+    def from_auth(cls, config: Configuration) -> "HTTPConfiguration":
+        return auth_to_http_config(config)
+
+    @classmethod
+    def from_target(cls, config: Configuration) -> "HTTPConfiguration":
+        return target_to_http_config(config)
 
 
 def auth_to_http_config(config: Configuration) -> HTTPConfiguration:

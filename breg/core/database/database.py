@@ -1,28 +1,107 @@
-from sqlite3 import Connection, connect, Cursor
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import Any
+
+from breg.type.data import (
+    ClassCache,
+    CourseCache,
+    Enrollment,
+)
 
 
-class SQLite:
-    _connection: Connection
+class Database(ABC):
+    @abstractmethod
+    def get_course_caches(
+        self,
+        *,
+        course_code: str | list[str] = None,
+        course_name: str | list[str] = None,
+        course_id: str | list[str] = None,
+        after: datetime = None,
+    ) -> list[CourseCache]:
+        pass
 
-    def __init__(self, db_path: str) -> None:
-        self._connection = connect(db_path)
+    @abstractmethod
+    def get_all_course_caches(
+        self,
+    ) -> list[CourseCache]:
+        pass
 
-    def get_connection(self) -> Connection:
-        return self._connection
+    @abstractmethod
+    def get_complete_course_cache(
+        self,
+        *,
+        course_code: str = None,
+        course_name: str = None,
+        course_id: str = None,
+        after: datetime = None,
+    ) -> CourseCache | None:
+        pass
 
-    def close(self) -> None:
-        self._connection.close()
+    @abstractmethod
+    def save_course_caches(self, course_caches: list[CourseCache] | CourseCache) -> int:
+        pass
 
-    def cursor(self) -> Cursor:
-        return self._connection.cursor()
+    @abstractmethod
+    def remove_course_caches(self, course_ids: list[int] | int) -> int:
+        pass
 
-    def commit(self) -> None:
-        self._connection.commit()
+    @abstractmethod
+    def get_class_caches(
+        self,
+        *,
+        course_code: str | list[str] = None,
+        class_code: str | list[str] = None,
+        class_id: str | list[str] = None,
+        after: datetime = None,
+        query_schedules: bool = True,
+    ) -> list[ClassCache]:
+        pass
 
-    def rollback(self) -> None:
-        self._connection.rollback()
+    @abstractmethod
+    def get_all_class_caches(
+        self,
+        *,
+        query_schedules: bool = True,
+    ) -> list[ClassCache]:
+        pass
 
-    def execute(self, query: str, params: tuple = ()) -> Cursor:
-        cursor = self._connection.cursor()
-        cursor.execute(query, params)
-        return cursor
+    @abstractmethod
+    def get_complete_class_cache(
+        self,
+        *,
+        course_code: str = None,
+        class_code: str = None,
+        class_id: str = None,
+        after: datetime = None,
+        query_schedules: bool = True,
+    ) -> ClassCache | None:
+        pass
+
+    @abstractmethod
+    def save_class_caches(self, class_caches: list[ClassCache] | ClassCache) -> int:
+        pass
+
+    @abstractmethod
+    def remove_class_caches(self, class_ids: list[int] | int) -> int:
+        pass
+
+    @abstractmethod
+    def get_enrollments(self) -> list[Enrollment]:
+        pass
+
+    @abstractmethod
+    def append_enrollments(self, enrollments: list[Enrollment] | Enrollment) -> int:
+        pass
+
+    @abstractmethod
+    def remove_enrollments(self, enrollment_ids: list[int] | int) -> int:
+        pass
+
+    @abstractmethod
+    def clear_enrollments(self) -> int:
+        pass
+
+    @abstractmethod
+    def execute_raw(self, query: str, parameters: tuple = ()) -> Any:
+        pass
