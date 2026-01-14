@@ -1,11 +1,14 @@
+""" ""Macro for executing enrollment actions."""
+
+from breg.runtime import ProcessorTypes
 from breg.type.api_internal import ClassID
 
 from .base import Macro
 
-from breg.runtime import ProcessorTypes
-
 
 class ExecuteMacro(Macro):
+    """Macro for executing enrollment actions."""
+
     def enroll(
         self,
         *,
@@ -14,6 +17,15 @@ class ExecuteMacro(Macro):
         course_id: str = None,
         course_code: str = None,
     ) -> None:
+        """Enroll in a class given class_id or class_code with course_id or course_code.
+        Either class_id or class_code with course_id or course_code must be provided.
+
+        Args:
+            class_id (str, optional): Class ID. Defaults to None.
+            class_code (str, optional): Class code. Defaults to None.
+            course_id (str, optional): Course ID. Defaults to None.
+            course_code (str, optional): Course code. Defaults to None.
+        """
         exec_processor = self._runtime_context.get_processor(ProcessorTypes.EXECUTOR)
         if class_id is None:
             class_id = self._get_class_id(
@@ -28,6 +40,21 @@ class ExecuteMacro(Macro):
         course_code: str = None,
         class_code: str = None,
     ) -> None:
+        """Unenroll from a class given enrollment_id or course_code and class_code.
+        Either enrollment_id or both course_code and class_code must be provided.
+
+        Args:
+            enrollment_id (str, optional): enrollment ID. Defaults to None.
+            course_code (str, optional): course code. Defaults to None.
+            class_code (str, optional): class code. Defaults to None.
+
+        Raises:
+            ValueError: If neither enrollment_id nor both course_code and class_code are provided.
+            ValueError: If enrollment is not found for the given course_code and class_code.
+
+        Returns:
+            None
+        """
         database = self._runtime_context.processor_context().database
         fetch_processor = self._runtime_context.get_processor(ProcessorTypes.FETCHER)
         exec_processor = self._runtime_context.get_processor(ProcessorTypes.EXECUTOR)

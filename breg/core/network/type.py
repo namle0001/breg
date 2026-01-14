@@ -1,3 +1,5 @@
+"""Defines types and interfaces for network operations."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
@@ -7,6 +9,8 @@ from requests import Response as LibResponse
 
 
 class ContentType(StrEnum):
+    """Enumeration of common HTTP content types."""
+
     FORM_URLENCODED = "application/x-www-form-urlencoded"
     MULTIPART_FORM_DATA = "multipart/form-data"
     JSON = "application/json"
@@ -14,6 +18,8 @@ class ContentType(StrEnum):
 
 @dataclass(frozen=True)
 class Cookie:
+    """Represents an HTTP cookie."""
+
     name: str = ""
     value: str = ""
     domain: str = ""
@@ -27,48 +33,109 @@ class Cookie:
 
 
 class Response(ABC):
+    """Abstract base class for HTTP responses."""
+
     @abstractmethod
     def status(self) -> int:
+        """Returns the HTTP status code of the response.
+
+        Returns:
+            int: The HTTP status code.
+        """
         pass
 
     @abstractmethod
     def ok(self) -> bool:
+        """Returns True if the HTTP response status code indicates success.
+
+        Returns:
+            bool: True if the response is successful, False otherwise.
+        """
         pass
 
     @abstractmethod
     def reason(self) -> str:
+        """Returns the reason phrase of the HTTP response.
+
+        Returns:
+            str: The reason phrase of the HTTP response.
+        """
         pass
 
     @abstractmethod
     def get_headers(self) -> dict[str, str]:
+        """Returns the headers of the HTTP response.
+
+        Returns:
+            dict[str, str]: The headers of the HTTP response.
+        """
         pass
 
     @abstractmethod
     def get_header(self, key: str, default: str | None = None) -> str | None:
+        """Returns the value of a specific header from the HTTP response.
+
+        Args:
+            key (str): The header key.
+            default (str | None, optional): The default value to return if the header is not found. Defaults to None.
+
+        Returns:
+            str | None: The value of the specified header, or the default value if not found.
+        """
         pass
 
     @abstractmethod
     def text(self) -> str:
+        """Returns the response body as a string.
+
+        Returns:
+            str: The response body as a string.
+        """
         pass
 
     @abstractmethod
     def json(self) -> Any:
+        """Returns the response body parsed as JSON.
+
+        Returns:
+            Any: The response body parsed as JSON.
+        """
         pass
 
     @abstractmethod
     def raw(self) -> bytes:
+        """Returns the raw response body as bytes.
+
+        Returns:
+            bytes: The raw response body as bytes.
+        """
         pass
 
     @abstractmethod
     def get_cookie(self, name: str) -> Cookie | None:
+        """Returns a specific cookie from the HTTP response.
+
+        Args:
+            name (str): The name of the cookie.
+
+        Returns:
+            Cookie | None: The cookie with the specified name, or None if not found.
+        """
         pass
 
     @abstractmethod
     def get_cookies(self) -> dict[str, Cookie]:
+        """Returns all cookies from the HTTP response.
+
+        Returns:
+            dict[str, Cookie]: A dictionary of all cookies from the HTTP response.
+        """
         pass
 
 
 class LibReqResponse(Response):
+    """Concrete implementation of the Response interface using the requests library."""
+
     _response: LibResponse
     _cookies: dict[str, Cookie] | None = None
 

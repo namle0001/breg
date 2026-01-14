@@ -1,13 +1,19 @@
-from .base import Macro
-from dataclasses import dataclass, fields
+"""Session management macros."""
 
-from breg.processor.session.round import RoundMananger
-from breg.core.network import Session
+from dataclasses import dataclass, fields
+from typing import TypedDict, get_type_hints
 
 from breg.config.config import HTTPConfiguration
+from breg.core.network import Session
+from breg.processor.session.round import RoundMananger
+from breg.type.data import Round
+
+from .base import Macro
 
 
 class SessionMacro(Macro):
+    """Macro for managing session data like JSESSIONID, round, and seed."""
+
     _SESSION_FILE = ".sess"
 
     @dataclass
@@ -27,7 +33,7 @@ class SessionMacro(Macro):
             return "\n".join(lines)
 
         @classmethod
-        def parse(cls, data) -> "SessionMacro.SessionData":
+        def parse(cls, data: str) -> "SessionMacro.SessionData":
             session_data = cls()
 
             for line in data.splitlines():
@@ -39,9 +45,13 @@ class SessionMacro(Macro):
                     setattr(session_data, key, value if value != "" else None)
             return session_data
 
-    def _save(self, data: dict) -> None:
-        old_data = self._load()
+    class SessionDataDict(TypedDict):
+        JSESSIONID: str
+        ROUND: str
+        SEED: str
 
+    def _save(self, data: SessionDataDict) -> None:
+        old_data = self._load()
         for key, value in data.items():
             if hasattr(old_data, key):
                 setattr(old_data, key, value)
@@ -52,6 +62,7 @@ class SessionMacro(Macro):
             session_file.write(old_data.unparse())
 
     def save_jsession(self) -> None:
+        """Saves the current JSESSIONID to the session file."""
         self._save(
             {
                 "JSESSIONID": self._runtime_context.processor_context().session.get_cookie(
@@ -61,6 +72,7 @@ class SessionMacro(Macro):
         )
 
     def save_round_and_seed(self) -> None:
+        """Saves the current round and seed to the session file."""
         round_mananger = self._runtime_context.get_processor(RoundMananger)
         self._save(
             {
@@ -77,6 +89,7 @@ class SessionMacro(Macro):
         return session_data
 
     def restore_jsession(self) -> None:
+        """Restores the JSESSIONID from the session file."""
         session_data = self._load()
         if session_data.JSESSIONID is None:
             return
@@ -94,6 +107,7 @@ class SessionMacro(Macro):
         )
 
     def restore_round_and_seed(self) -> None:
+        """Restores the round and seed from the session file."""
         session_data = self._load()
         round_mananger = self._runtime_context.get_processor(RoundMananger)
 
@@ -104,9 +118,37 @@ class SessionMacro(Macro):
                 round_mananger.switch_seed(session_data.SEED)
 
     def switch_round(self, round_id: str) -> None:
+        """Switches to a specific round.
+
+        Args:
+            round_id (str): Round id number.
+        """
         round_mananger = self._runtime_context.get_processor(RoundMananger)
         round_mananger.switch_round(round_id)
 
     def switch_seed(self, seed_id: str) -> None:
+        """Switches to a specific seed.
+
+        Args:
+            seed_id (str): Seed id number.
+        """
         round_mananger = self._runtime_context.get_processor(RoundMananger)
         round_mananger.switch_seed(seed_id)
+
+    def get_rounds(self) -> list[Round]:
+        """Fetches the list of rounds.
+
+        Returns:
+            list[Round]: List of Round objects.
+        """
+        round_mananger = self._runtime_context.get_processor(RoundMananger)
+        return round_mananger.get_rounds()
+
+    def get_seeds(self) -> list[Round]:
+        """Fetches the list of seeds.
+
+        Returns:
+            list[Seed]: List of Seed objects.
+        """
+        round_mananger = self._runtime_context.get_processor(RoundMananger)
+        return round_mananger.get_seeds()

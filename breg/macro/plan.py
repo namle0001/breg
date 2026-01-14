@@ -1,8 +1,9 @@
-from heapq import heappop
-from threading import Lock, Thread, Event
-from json import JSONDecoder, JSONEncoder
+"""Macro for planning class schedules using the SchedulePlanner."""
 
 from enum import Enum
+from heapq import heappop
+from json import JSONDecoder, JSONEncoder
+from threading import Event, Lock, Thread
 
 from breg.processor.plan import Preferences, SchedulePlanner
 from breg.processor.plan.planner import (
@@ -16,6 +17,7 @@ from breg.processor.plan.planner import (
 from breg.runtime import RuntimeContext
 from breg.runtime.registry import ProcessorTypes
 from breg.type import ClassCache
+
 from .base import Macro
 
 
@@ -36,6 +38,8 @@ def _lock_method(lock_attr: str, blocking: bool = True):
 
 
 class PlanMacro(Macro):
+    """Macro for planning class schedules using the SchedulePlanner."""
+
     _lock: Lock
     _runner: "Runner"
 
@@ -58,6 +62,11 @@ class PlanMacro(Macro):
 
     @_lock_method("_lock", False)
     def run(self, detached: bool = True) -> None:
+        """Run the planner either in detached mode or blocking mode.
+
+        Args:
+            detached (bool, optional): Whether to run the planner in detached mode. Defaults to True.
+        """
         planner = self._runtime_context.get_processor(ProcessorTypes.PLANNER)
         if not detached:
             while planner.step():

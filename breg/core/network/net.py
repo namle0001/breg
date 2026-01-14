@@ -1,17 +1,31 @@
+"""Module for HTTP networking functionality."""
+
+from threading import Lock
 from typing import Any
 from urllib.parse import urlencode
 
 from requests import Request as LibRequest
 from requests import Session as LibSession
 
-from threading import Lock
-
 from breg.config.config import HTTPConfiguration
 
 from .type import ContentType, LibReqResponse, Response
 
 
+def _lock_method(lock_attr: str):
+    def decorator(method):
+        def wrapper(self, *args, **kwargs):
+            with getattr(self, lock_attr):
+                return method(self, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 class HTTP:
+    """A class for making HTTP requests with configurable headers and cookies."""
+
     _config: HTTPConfiguration
     _headers: dict[str, Any]
     _cookies: dict[str, str]
@@ -27,6 +41,13 @@ class HTTP:
         headers: dict[str, Any] = None,
         cookies: dict[str, str] = None,
     ):
+        """Initializes the HTTP client with the given configuration, headers, and cookies.
+
+        Args:
+            config (HTTPConfiguration): The HTTP configuration settings.
+            headers (dict[str, Any], optional): Initial headers to include in requests. Defaults to None.
+            cookies (dict[str, str], optional): Initial cookies to include in requests. Defaults to None.
+        """
         self._config = config
         self._headers = headers if headers is not None else {}
         self._cookies = cookies if cookies is not None else {}
@@ -48,6 +69,20 @@ class HTTP:
         headers: dict[str, Any] = None,
         follow_redirects: bool = False,
     ) -> Response:
+        """Makes an HTTP request with the specified parameters.
+
+        Args:
+            method (str): The HTTP method (e.g., 'GET', 'POST').
+            path (str | list[str]): The URL path or list of path segments.
+            body (Any, optional): The request body. Defaults to None.
+            query (dict, optional): Query parameters to include in the URL. Defaults to None.
+            fragment (str, optional): URL fragment identifier. Defaults to None.
+            headers (dict[str, Any], optional): Additional headers to include in the request. Defaults to None.
+            follow_redirects (bool, optional): Whether to follow HTTP redirects. Defaults to False.
+
+        Returns:
+            Response: The HTTP response.
+        """
         query_string: str | None = None
         fragment_string: str | None = None
         if query:
@@ -110,6 +145,18 @@ class HTTP:
         headers: dict[str, Any] = None,
         follow_redirects: bool = False,
     ) -> Response:
+        """Makes a GET request to the specified path with optional query parameters, fragment, headers, and redirect behavior.
+
+        Args:
+            path (str | list[str]): The URL path or list of path segments.
+            query (dict, optional): Query parameters to include in the URL. Defaults to None.
+            fragment (str, optional): URL fragment identifier. Defaults to None.
+            headers (dict[str, Any], optional): Additional headers to include in the request. Defaults to None.
+            follow_redirects (bool, optional): Whether to follow HTTP redirects. Defaults to False.
+
+        Returns:
+            Response: The HTTP response.
+        """
         return self.request(
             "GET",
             path,
@@ -128,6 +175,19 @@ class HTTP:
         headers: dict[str, Any] = None,
         content_type: "ContentType" = None,
     ) -> Response:
+        """Makes a POST request to the specified path with the given body, optional query parameters, fragment, headers, and content type.
+
+        Args:
+            path (str | list[str]): The URL path or list of path segments.
+            body (Any): The request body.
+            query (dict, optional): Query parameters to include in the URL. Defaults to None.
+            fragment (str, optional): URL fragment identifier. Defaults to None.
+            headers (dict[str, Any], optional): Additional headers to include in the request. Defaults to None.
+            content_type (ContentType, optional): The content type of the request. Defaults to None.
+
+        Returns:
+            Response: The HTTP response.
+        """
         if content_type is not None:
             if headers is None:
                 headers = {}
@@ -138,48 +198,104 @@ class HTTP:
             "POST", path, body, query=query, fragment=fragment, headers=headers
         )
 
+    @_lock_method("_lock")
     def add_header(self, key: str, value: str) -> None:
-        with self._lock:
-            self._headers[key] = value
+        """Adds a header to the HTTP client.
 
+        Args:
+            key (str): The header key.
+            value (str): The header value.
+        """
+        self._headers[key] = value
+
+    @_lock_method("_lock")
     def remove_header(self, key: str) -> Any:
-        with self._lock:
-            return self._headers.pop(key, None)
+        """Removes a header from the HTTP client.
 
+        Args:
+            key (str): The header key.
+
+        Returns:
+            Any: The removed header value, or None if the header was not found.
+        """
+        return self._headers.pop(key, None)
+
+    @_lock_method("_lock")
     def get_headers(self) -> dict[str, Any]:
-        with self._lock:
-            return self._headers.copy()
+        """Gets a copy of all headers in the HTTP client.
 
+        Returns:
+            dict[str, Any]: A copy of all headers.
+        """
+        return self._headers.copy()
+
+    @_lock_method("_lock")
     def get_header(self, key: str) -> str | None:
-        with self._lock:
-            return self._headers.get(key)
+        """Gets the value of a specific header.
+
+        Args:
+            key (str): The header key.
+
+        Returns:
+            str | None: The header value, or None if the header was not found.
+        """
+        return self._headers.get(key)
 
     def set_header(self, key: str, value: str) -> None:
+        """Sets the value of a specific header, replacing it if it already exists.
+
+        Args:
+            key (str): The header key.
+            value (str): The header value.
+        """
         self.remove_header(key)
         self.add_header(key, value)
 
+    @_lock_method("_lock")
     def clear_headers(self) -> None:
-        with self._lock:
-            self._headers = {}
+        """Clears all headers from the HTTP client."""
+        self._headers = {}
 
+    @_lock_method("_lock")
     def set_cookie(self, key: str, value: str) -> None:
-        with self._lock:
-            self._cookies[key] = value
+        """Sets a cookie in the HTTP client.
 
+        Args:
+            key (str): The cookie key.
+            value (str): The cookie value.
+        """
+        self._cookies[key] = value
+
+    @_lock_method("_lock")
     def get_cookie(self, key: str) -> str | None:
-        with self._lock:
-            return self._cookies.get(key)
+        """Gets the value of a specific cookie.
 
+        Args:
+            key (str): The cookie key.
+
+        Returns:
+            str | None: The cookie value, or None if the cookie was not found.
+        """
+        return self._cookies.get(key)
+
+    @_lock_method("_lock")
     def remove_cookie(self, key: str) -> None:
-        with self._lock:
-            if key in self._cookies:
-                del self._cookies[key]
+        """Removes a cookie from the HTTP client.
+
+        Args:
+            key (str): The cookie key.
+        """
+        if key in self._cookies:
+            del self._cookies[key]
 
     def get_lock(self) -> Lock:
+        """Gets the lock used for thread-safe operations."""
         return self._lock
 
 
 class Session(HTTP):
+    """A class representing an HTTP session with additional session data."""
+
     _session_token: str
     additional_data: dict[str, Any]
 
@@ -189,6 +305,13 @@ class Session(HTTP):
         session_token: str = "",
         session_name: str = "JSESSIONID",
     ):
+        """Initializes the Session with the given configuration and session token.
+
+        Args:
+            config (HTTPConfiguration): The HTTP configuration.
+            session_token (str, optional): The session token. Defaults to "".
+            session_name (str, optional): The session cookie name. Defaults to "JSESSIONID".
+        """
         super().__init__(config)
         self._session_token = session_token
         self.additional_data = {}
@@ -199,6 +322,16 @@ class Session(HTTP):
     def from_http(
         cls, http: HTTP, session_token: str, session_name: str = "JSESSIONID"
     ) -> "Session":
+        """Creates a Session instance from an existing HTTP instance.
+
+        Args:
+            http (HTTP): The existing HTTP instance.
+            session_token (str): The session token.
+            session_name (str, optional): The session cookie name. Defaults to "JSESSIONID".
+
+        Returns:
+            Session: A new Session instance created from the given HTTP instance.
+        """
         return cls(http._config, session_token, session_name)
 
 

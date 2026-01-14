@@ -1,17 +1,17 @@
-from heapq import heappop, heappush
-from dataclasses import dataclass, field
 from collections import deque
+from dataclasses import dataclass, field
+from heapq import heappop, heappush
 
 from breg.type import ClassCache
 from breg.type.data import Schedule
-from .preferences import (
-    GapPenalty,
-    Preferences,
-    TimeTablePreferences,
-    NeutralGapPenalty,
-)
 
 from ..base import Processor
+from .preferences import (
+    GapPenalty,
+    NeutralGapPenalty,
+    Preferences,
+    TimeTablePreferences,
+)
 
 
 class SchedulePlanner(Processor):

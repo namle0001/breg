@@ -1,14 +1,10 @@
 """Module for parsing configuration and environment data."""
 
-from typing import TypeVar
-
 from breg.config.config import Configuration
 from breg.config.env import Environment
 
-T = TypeVar("T")
 
-
-def parse_key_value_file(file_path: str, cls: T) -> T:
+def parse_key_value_file[T](file_path: str, cls: T) -> T:
     """Parse a simple key-value pair file into an instance of the given class.
 
     Args:

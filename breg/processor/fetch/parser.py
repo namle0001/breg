@@ -139,6 +139,28 @@ def parse_class_data(raw_data: str) -> list[ClassCache]:
     return classes
 
 
+def _parse_timeframe_str(timeframe_str: str) -> TimeframeBF:
+    timeframe_bf = TimeframeBF()
+    periods = timeframe_str.split()
+    for period in periods:
+        if not period.isdigit():
+            continue
+        period_int = int(period)
+        if 1 <= period_int <= 16:
+            setattr(timeframe_bf, f"period_{period_int}", 1)
+    return timeframe_bf
+
+
+def _parse_week_str(week_str: str) -> WeekBF:
+    week_bf = WeekBF()
+
+    for week, _ in enumerate(week_str):
+        if week_str[week] != "-":
+            setattr(week_bf, f"week_{week + 1}", 1)
+
+    return week_bf
+
+
 def parse_schedule_table(table: Tag) -> list[Schedule]:
     schedules = table.select("tr")
     schedule_list: list[Schedule] = []
@@ -155,7 +177,7 @@ def parse_schedule_table(table: Tag) -> list[Schedule]:
         week = schedule_info[5].get_text(strip=True)
 
         day_bf = DayBF.from_int(_day_map.get(normalize("NFC", day).casefold(), 0))
-        timeframe_bf = TimeframeBF.from_timeframe_str(timeframe)
+        timeframe_bf = _parse_timeframe_str(timeframe)
         week_bf = WeekBF.from_week_str(week)
         schedule_list.append(
             Schedule(

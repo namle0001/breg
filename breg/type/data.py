@@ -1,19 +1,24 @@
+"""Data types for BReg system."""
+
 from ctypes import (
+    POINTER,
     Structure,
     c_uint8,
     c_uint16,
     c_uint64,
     cast,
-    POINTER,
     pointer,
 )
+from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from breg.type.api_internal import EnrollmentID, ClassID
+from breg.type.api_internal import ClassID, EnrollmentID
 
 
 class Enrollment:
+    """Represents a student's enrollment in a specific course and class."""
+
     enrollment_id: EnrollmentID
     course_code: str
     class_code: str
@@ -30,6 +35,8 @@ class Enrollment:
 
 
 class ClassCache:
+    """Represents cached data for a specific class."""
+
     cache_id: int
     timestamp: datetime
     course_code: str
@@ -64,6 +71,11 @@ class ClassCache:
 
     @classmethod
     def fields(cls) -> list[str]:
+        """Returns the list of fields in the ClassCache.
+
+        Returns:
+            list[str]: A list of field names in the ClassCache.
+        """
         return [
             "cache_id",
             "timestamp",
@@ -78,6 +90,8 @@ class ClassCache:
 
 
 class Schedule:
+    """Represents a schedule instance of a class."""
+
     schedule_id: int
     day: "DayBF"
     timeframe: "TimeframeBF"
@@ -99,6 +113,14 @@ class Schedule:
         self.location = location
 
     def conflicts_with(self, other: "Schedule") -> bool:
+        """Determines if this schedule conflicts with another schedule.
+
+        Args:
+            other (Schedule): The other schedule to compare with.
+
+        Returns:
+            bool: True if the schedules conflict, False otherwise.
+        """
         if not self.day & other.day:
             return False
         if not self.timeframe & other.timeframe:
@@ -131,6 +153,11 @@ class Schedule:
         )
 
     def dict(self) -> "dict":
+        """Converts the Schedule instance to a dictionary.
+
+        Returns:
+            dict: A dictionary representation of the Schedule instance.
+        """
         return {
             "schedule_id": self.schedule_id,
             "day": self.day.value(),
@@ -141,6 +168,14 @@ class Schedule:
 
     @classmethod
     def from_dict(cls, data: "dict") -> "Schedule":
+        """Creates a Schedule instance from a dictionary.
+
+        Args:
+            data (dict): A dictionary containing schedule data.
+
+        Returns:
+            Schedule: A Schedule instance created from the dictionary.
+        """
         return cls(
             schedule_id=data.get("schedule_id"),
             day=DayBF.from_int(data.get("day", 0)),
@@ -151,6 +186,11 @@ class Schedule:
 
     @classmethod
     def fields(cls) -> list[str]:
+        """Returns the list of fields in the Schedule.
+
+        Returns:
+            list[str]: A list of field names in the Schedule.
+        """
         return [
             "schedule_id",
             "day",
@@ -161,6 +201,10 @@ class Schedule:
 
 
 class LogicalSchedule(Schedule):
+    """A logical representation of a schedule.
+    Its instance is an identical Schedule by location, day, timeframe and week.
+    """
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, LogicalSchedule):
             return NotImplemented
@@ -183,6 +227,14 @@ class LogicalSchedule(Schedule):
 
     @classmethod
     def from_schedule(cls, schedule: Schedule) -> "LogicalSchedule":
+        """Creates a LogicalSchedule instance from a Schedule instance.
+
+        Args:
+            schedule (Schedule): The Schedule instance to convert.
+
+        Returns:
+            LogicalSchedule: A LogicalSchedule instance created from the Schedule.
+        """
         return cls(
             schedule_id=schedule.schedule_id,
             day=schedule.day,
@@ -192,11 +244,18 @@ class LogicalSchedule(Schedule):
         )
 
     @classmethod
-    def from_schedules(cls, schedules: list[Schedule]) -> list["LogicalSchedule"]:
+    def from_schedules(cls, schedules: list[Schedule]) -> "list[LogicalSchedule]":
+        """Creates a list of LogicalSchedule instances from a list of Schedule instances.
+
+        Returns:
+            list[LogicalSchedule]: A list of LogicalSchedule instances created from the list of Schedule instances.
+        """
         return [cls.from_schedule(schedule) for schedule in schedules]
 
 
 class CourseCache:
+    """Represents cached data for a specific course."""
+
     cache_id: int
     timestamp: datetime
     course_code: str
@@ -222,6 +281,11 @@ class CourseCache:
 
     @classmethod
     def fields(cls) -> list[str]:
+        """Returns the list of fields in the CourseCache.
+
+        Returns:
+            list[str]: A list of field names in the CourseCache.
+        """
         return [
             "cache_id",
             "timestamp",
@@ -233,6 +297,11 @@ class CourseCache:
 
 
 class DayBF(Structure):
+    """Days of the week bitfield representation.
+    Each bit represents a day of the week, starting from Monday (bit 0) to Sunday (bit 6).
+    The 8th bit is reserved and should be ignored.
+    """
+
     _fields_ = [
         ("mon", c_uint8, 1),
         ("tue", c_uint8, 1),
@@ -245,11 +314,26 @@ class DayBF(Structure):
     ]
 
     def value(self) -> int:
+        """Returns the integer value of the DayBF bitfield.
+
+        Returns:
+            int: The integer value of the DayBF bitfield.
+        """
         return (
             cast(pointer(self), POINTER(c_uint8)).contents.value & 0x7F
         )  # Mask out reserved bit
 
     def get(self, day: "Day | int | str") -> int:
+        """Gets the value of a specific day in the DayBF.
+
+        Args:
+            day (Day | int | str): The day to get the value for.
+
+        Raises:
+            ValueError: If the day is invalid.
+        Returns:
+            int: The value of the specified day in the DayBF.
+        """
         if isinstance(day, Day):
             day_str = day.value
         elif isinstance(day, int):
@@ -282,12 +366,25 @@ class DayBF(Structure):
 
     @classmethod
     def from_int(cls, value: int) -> "DayBF":
+        """Creates a DayBF instance from an integer value.
+
+        Args:
+            value (int): The integer value to create the DayBF from.
+
+        Returns:
+            DayBF: A DayBF instance created from the given integer value.
+        """
         instance = cls()
         # Mask out reserved bit
         cast(pointer(instance), POINTER(c_uint8)).contents.value = value & 0x7F
         return instance
 
     def dict(self) -> "dict[str, int]":
+        """Converts the DayBF instance to a dictionary.
+
+        Returns:
+            dict[str, int]: A dictionary representation of the DayBF instance.
+        """
         d = {}
         for f in self._fields_[:-1]:  # Exclude reserved
             field_name = f[0]
@@ -296,33 +393,44 @@ class DayBF(Structure):
         return d
 
     def list(self) -> "list[int]":
+        """Converts the DayBF instance to a list.
+        The returned list has each element representing a day of the week,
+        and its value is 1 if the day is set, otherwise 0.
+
+        Returns:
+            list[int]: A list representation of the DayBF instance.
+        """
         return [getattr(self, f[0]) for f in self._fields_[:-1]]  # Exclude reserved
 
 
 class TimeframeBF(Structure):
-    _fields_ = [
-        ("period_1", c_uint16, 1),
-        ("period_2", c_uint16, 1),
-        ("period_3", c_uint16, 1),
-        ("period_4", c_uint16, 1),
-        ("period_5", c_uint16, 1),
-        ("period_6", c_uint16, 1),
-        ("period_7", c_uint16, 1),
-        ("period_8", c_uint16, 1),
-        ("period_9", c_uint16, 1),
-        ("period_10", c_uint16, 1),
-        ("period_11", c_uint16, 1),
-        ("period_12", c_uint16, 1),
-        ("period_13", c_uint16, 1),
-        ("period_14", c_uint16, 1),
-        ("period_15", c_uint16, 1),
-        ("period_16", c_uint16, 1),
-    ]
+    """Timeframes bitfield representation.
+    Each bit represents a period, starting from period 1 (bit 0) to period 16 (bit 15).
+    """
+
+    # Period 1 to 16
+    _fields_ = [(f"period_{i}", c_uint16, 1) for i in range(1, 16 + 1)]
 
     def value(self) -> int:
+        """Returns the integer value of the TimeframeBF bitfield.
+
+        Returns:
+            int: The integer value of the TimeframeBF bitfield.
+        """
         return cast(pointer(self), POINTER(c_uint16)).contents.value
 
     def get(self, period: int) -> int:
+        """Gets the value of a specific period in the TimeframeBF.
+
+        Args:
+            period (int): The period to get the value for.
+
+        Raises:
+            ValueError: If the period is not between 1 and 16.
+
+        Returns:
+            int: The value of the specified period. 0 if not set, 1 if set.
+        """
         if 1 <= period <= 16:
             return getattr(self, f"period_{period}")
         raise ValueError("Period must be between 1 and 16")
@@ -346,24 +454,24 @@ class TimeframeBF(Structure):
 
     @classmethod
     def from_int(cls, value: int) -> "TimeframeBF":
+        """Creates a TimeframeBF instance from an integer value.
+
+        Args:
+            value (int): The integer value to create the TimeframeBF from.
+
+        Returns:
+            TimeframeBF: A TimeframeBF instance created from the given integer value.
+        """
         instance = cls()
         cast(pointer(instance), POINTER(c_uint16)).contents.value = value
         return instance
 
-    @classmethod
-    def from_timeframe_str(cls, timeframe_str: str) -> "TimeframeBF":
-        timeframe_bf = cls()
-        periods = timeframe_str.split(None)
-        for period in periods:
-            if not period.isdigit():
-                continue
-            period_int = int(period)
-            if 1 <= period_int <= 16:
-                setattr(timeframe_bf, f"period_{period_int}", 1)
-
-        return timeframe_bf
-
     def dict(self) -> "dict[str, int]":
+        """Converts the TimeframeBF instance to a dictionary.
+
+        Returns:
+            dict[str, int]: A dictionary representation of the TimeframeBF instance.
+        """
         d = {}
         for f in self._fields_:
             field_name = f[0]
@@ -372,81 +480,42 @@ class TimeframeBF(Structure):
         return d
 
     def list(self) -> "list[int]":
+        """Converts the TimeframeBF instance to a list.
+
+        Returns:
+            list[int]: A list representation of the TimeframeBF instance.
+        """
         return [getattr(self, f[0]) for f in self._fields_]
 
 
 class WeekBF(Structure):
-    _fields_ = [
-        ("week_1", c_uint64, 1),
-        ("week_2", c_uint64, 1),
-        ("week_3", c_uint64, 1),
-        ("week_4", c_uint64, 1),
-        ("week_5", c_uint64, 1),
-        ("week_6", c_uint64, 1),
-        ("week_7", c_uint64, 1),
-        ("week_8", c_uint64, 1),
-        ("week_9", c_uint64, 1),
-        ("week_10", c_uint64, 1),
-        ("week_11", c_uint64, 1),
-        ("week_12", c_uint64, 1),
-        ("week_13", c_uint64, 1),
-        ("week_14", c_uint64, 1),
-        ("week_15", c_uint64, 1),
-        ("week_16", c_uint64, 1),
-        ("week_17", c_uint64, 1),
-        ("week_18", c_uint64, 1),
-        ("week_19", c_uint64, 1),
-        ("week_20", c_uint64, 1),
-        ("week_21", c_uint64, 1),
-        ("week_22", c_uint64, 1),
-        ("week_23", c_uint64, 1),
-        ("week_24", c_uint64, 1),
-        ("week_25", c_uint64, 1),
-        ("week_26", c_uint64, 1),
-        ("week_27", c_uint64, 1),
-        ("week_28", c_uint64, 1),
-        ("week_29", c_uint64, 1),
-        ("week_30", c_uint64, 1),
-        ("week_31", c_uint64, 1),
-        ("week_32", c_uint64, 1),
-        ("week_33", c_uint64, 1),
-        ("week_34", c_uint64, 1),
-        ("week_35", c_uint64, 1),
-        ("week_36", c_uint64, 1),
-        ("week_37", c_uint64, 1),
-        ("week_38", c_uint64, 1),
-        ("week_39", c_uint64, 1),
-        ("week_40", c_uint64, 1),
-        ("week_41", c_uint64, 1),
-        ("week_42", c_uint64, 1),
-        ("week_43", c_uint64, 1),
-        ("week_44", c_uint64, 1),
-        ("week_45", c_uint64, 1),
-        ("week_46", c_uint64, 1),
-        ("week_47", c_uint64, 1),
-        ("week_48", c_uint64, 1),
-        ("week_49", c_uint64, 1),
-        ("week_50", c_uint64, 1),
-        ("week_51", c_uint64, 1),
-        ("week_52", c_uint64, 1),
-        ("week_53", c_uint64, 1),
-        ("week_54", c_uint64, 1),
-        ("week_55", c_uint64, 1),
-        ("week_56", c_uint64, 1),
-        ("week_57", c_uint64, 1),
-        ("week_58", c_uint64, 1),
-        ("week_59", c_uint64, 1),
-        ("week_60", c_uint64, 1),
-        ("week_61", c_uint64, 1),
-        ("week_62", c_uint64, 1),
-        ("week_63", c_uint64, 1),
-        ("week_64", c_uint64, 1),
-    ]
+    """Weeks bitfield representation.
+    Each bit represents a week, starting from week 1 (bit 0) to week 64 (bit 63).
+    """
+
+    # Week 1 to 64
+    _fields_ = [(f"week_{i}", c_uint64, 1) for i in range(1, 64 + 1)]
 
     def value(self) -> int:
+        """Returns the integer value of the WeekBF bitfield.
+
+        Returns:
+            int: The integer value of the WeekBF bitfield.
+        """
         return cast(pointer(self), POINTER(c_uint64)).contents.value
 
     def get(self, week: int) -> int:
+        """Gets the value of a specific week in the WeekBF.
+
+        Args:
+            week (int): The week number to get the value for.
+
+        Raises:
+            ValueError: If the week is not between 1 and 64.
+
+        Returns:
+            int: The toggle value of the specified week. 0 if not set, 1 if set.
+        """
         if 1 <= week <= 64:
             return getattr(self, f"week_{week}")
         raise ValueError("Week must be between 1 and 64")
@@ -470,23 +539,24 @@ class WeekBF(Structure):
 
     @classmethod
     def from_int(cls, value: int) -> "WeekBF":
+        """Creates a WeekBF instance from an integer representation.
+
+        Args:
+            value (int): The integer value to create the WeekBF from.
+
+        Returns:
+            WeekBF: A WeekBF instance created from the given integer value.
+        """
         instance = cls()
         cast(pointer(instance), POINTER(c_uint64)).contents.value = value
         return instance
 
-    @classmethod
-    def from_week_str(cls, week_str: str) -> "WeekBF":
-        week_bf = cls()
-        week = 0
-
-        while week < len(week_str):
-            if week_str[week] != "-":
-                setattr(week_bf, f"week_{week + 1}", 1)
-            week += 1
-
-        return week_bf
-
     def dict(self) -> "dict[str, int]":
+        """Converts the WeekBF instance to a dictionary.
+
+        Returns:
+            dict[str, int]: A dictionary representation of the WeekBF instance.
+        """
         d = {}
         for f in self._fields_:
             field_name = f[0]
@@ -495,10 +565,17 @@ class WeekBF(Structure):
         return d
 
     def list(self) -> "list[int]":
+        """Converts the WeekBF instance to a list.
+
+        Returns:
+            list[int]: A list representation of the WeekBF instance.
+        """
         return [getattr(self, f[0]) for f in self._fields_]
 
 
 class Day(StrEnum):
+    """Enumeration for days of the week."""
+
     MONDAY = "mon"
     TUESDAY = "tue"
     WEDNESDAY = "wed"
@@ -511,6 +588,17 @@ class Day(StrEnum):
 
     @classmethod
     def from_str(cls, day_str: str) -> "Day":
+        """Returns the Day enum member corresponding to the given string.
+
+        Args:
+            day_str (str): The string representation of the day.
+
+        Raises:
+            ValueError: If the day string is not valid.
+
+        Returns:
+            Day: The Day enum member corresponding to the given string.
+        """
         day_str = day_str.lower()
         for day in cls:
             if day.value == day_str:
@@ -531,12 +619,52 @@ class Day(StrEnum):
 
     @classmethod
     def from_int(cls, value: int) -> "Day":
+        """Returns the Day enum member corresponding to the given integer.
+        Start from 0 (Monday) to 6 (Sunday).
+
+        Args:
+            value (int): The integer representation of the day.
+
+        Raises:
+            ValueError: If the integer is not between 0 and 6.
+
+        Returns:
+            Day: The Day enum member corresponding to the given integer.
+        """
         if value in cls.__day_map():
             return cls.__day_map()[value]
         raise ValueError(f"Invalid day integer: {value}")
 
     def to_int(self) -> int:
+        """Returns the integer representation of the Day enum member.
+        Start from 0 (Monday) to 6 (Sunday).
+
+        Raises:
+            ValueError: If the Day enum member is invalid.
+
+        Returns:
+            int: The integer representation of the Day enum member.
+        """
         for key, val in self.__day_map().items():
             if val == self:
                 return key
         raise ValueError(f"Invalid day enum: {self}")
+
+
+@dataclass
+class Round:
+    """Represents a round of course registration."""
+
+    round_id: str = None
+    round_name: str = None
+    round_title: str = None
+    start_time: str = None
+    end_time: str = None
+
+
+@dataclass
+class Seed:
+    """Represents a seed of course registration."""
+
+    seed_id: str = None
+    seed_title: str = None

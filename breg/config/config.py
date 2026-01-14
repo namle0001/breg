@@ -1,6 +1,7 @@
 """Configuration module for the application."""
 
 from dataclasses import dataclass
+from typing import TypedDict
 
 
 @dataclass
@@ -31,6 +32,8 @@ class Configuration:
     TARGET_SERVICE_TICKET_NAME: str = None
     TARGET_SERVICE_SESSION_NAME: str = None
 
+    TARGET_FETCH_ROUNDS_PATH: str = None
+    TARGET_FETCH_SEEDS_PATH: str = None
     TARGET_SWITCH_ROUND_PATH: str = None
     TARGET_SWITCH_SEED_PATH: str = None
     TARGET_REGISTER_PATH: str = None
@@ -49,10 +52,79 @@ class Configuration:
     DB_SQLITE_CACHE_PATH: str = None
     DB_SQLITE_ENROLLMENT_PATH: str = None
 
-    def ensure_types(self):
+    def ensure_types(self) -> None:
         """Ensure that all configuration attributes have the correct types."""
         self.PORT = int(self.PORT)
         self.HTTPS = bool(self.HTTPS)
+
+
+class AuthServiceConfig(TypedDict):
+    name: str
+    hostname: str
+    path: str
+    url: str
+    token_name: str
+    query_service_name: str
+    query_response_ticket_name: str
+
+
+class TargetServiceConfig(TypedDict):
+    name: str
+    hostname: str
+    path: str
+    url: str
+    auth_path: str
+    ticket_name: str
+    session_name: str
+
+    fetch_rounds_path: str
+    fetch_seeds_path: str
+    switch_round_path: str
+    switch_seed_path: str
+    register_path: str
+    unregister_path: str
+    fetch_enrollments_path: str
+    fetch_courses_path: str
+    fetch_classes_path: str
+
+
+class NetworkNameConfig(TypedDict):
+    round: str
+    seed: str
+    course_code: str
+    course_id: str
+    class_id: str
+    enrollment_id: str
+
+
+class DbSqliteConfig(TypedDict):
+    cache_path: str
+    enrollment_path: str
+
+
+class DatabaseConfig(TypedDict):
+    sqlite: DbSqliteConfig
+
+
+class NameConfig(TypedDict):
+    network: NetworkNameConfig
+
+
+class ServiceConfig(TypedDict):
+    auth: AuthServiceConfig
+    target: TargetServiceConfig
+
+
+class NewConfig(TypedDict):
+    config_name: str
+    config_version: str
+    port: int
+    https: bool
+    user_agent: str
+
+    service: ServiceConfig
+    network: NameConfig
+    database: DatabaseConfig
 
 
 class HTTPConfiguration:

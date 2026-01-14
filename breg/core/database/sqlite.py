@@ -1,9 +1,11 @@
+"""SQLite database implementation for BReg."""
+
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from sqlite3 import Connection, connect
 from threading import RLock
 from typing import Any
-from pathlib import Path
 
 from breg.core.database.database import Database
 from breg.type.data import (
@@ -30,6 +32,8 @@ def _lock_method(lock_attr: str):
 
 
 class SQLite(Database):
+    """SQLite implementation of Database."""
+
     _cache_db_path: str
     _enrollment_db_path: str
     _cache_connection: Connection
@@ -39,6 +43,12 @@ class SQLite(Database):
     def __init__(
         self, cache_db_path: str = None, enrollment_db_path: str = None
     ) -> None:
+        """Initialize SQLite database.
+
+        Args:
+            cache_db_path (str, optional): The path to the cache database file. Defaults to None.
+            enrollment_db_path (str, optional): The path to the enrollment database file. Defaults to None.
+        """
         need_cache_migration = False
         need_enrollment_migration = False
         if cache_db_path and not Path.exists(cache_db_path):
@@ -110,11 +120,10 @@ class SQLite(Database):
         self._enrollment_connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS enrollment (
+                seq_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 enrollment_id INTEGER DEFAULT NULL,
                 course_code TEXT NOT NULL,
                 class_code TEXT NOT NULL,
-
-                PRIMARY KEY (course_code, class_code)
             )"""
         )
 

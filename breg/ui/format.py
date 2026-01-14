@@ -1,6 +1,8 @@
+from typing import Literal
 from tabulate import tabulate
 
-from breg.type.data import ClassCache
+from breg.type.data import ClassCache, Round
+from shutil import get_terminal_size
 
 
 def format_classes_schedules(
@@ -79,3 +81,77 @@ def format_classes_schedules(
         table_data.extend(schedules)
 
     return tabulate(table_data, headers=headers, tablefmt=tablefmt)
+
+
+def format_rounds(
+    rounds: list[Round],
+    tablefmt: str = "simple_grid",
+    limit: int = 10,
+    sort: Literal["asc", "desc"] = "asc",
+) -> str:
+    """Format rounds into a table string.
+
+    Args:
+        rounds (list[Round]): List of Round objects.
+
+    Returns:
+        str: Formatted table string of rounds.
+    """
+
+    headers = ["Round Name", "Round Title", "Start Time", "End Time"]
+    table_data = []
+
+    if limit > 0 and len(rounds) > limit:
+        rounds = rounds[:limit]
+
+    it = rounds if sort == "desc" else reversed(rounds)
+    for r in it:
+        table_data.append(
+            [
+                r.round_id,
+                r.round_name,
+                r.round_title,
+                r.start_time,
+                r.end_time,
+            ]
+        )
+
+    maxcolwidths = [
+        None,
+        None,
+        min(get_terminal_size().columns - 10 - (20 + 20 + 20), 60),
+        None,
+        None,
+    ]
+
+    return tabulate(
+        table_data, headers=headers, tablefmt=tablefmt, maxcolwidths=maxcolwidths
+    )
+
+
+def format_seeds(seeds: list[Round], tablefmt: str = "simple_grid") -> str:
+    """Format seeds into a table string.
+
+    Args:
+        seeds (list[Seed]): List of Seed objects.
+
+    Returns:
+        str: Formatted table string of seeds.
+    """
+
+    headers = ["Seed ID", "Seed Title"]
+    table_data = []
+
+    for s in seeds:
+        table_data.append(
+            [
+                s.seed_id,
+                s.seed_title,
+            ]
+        )
+
+    maxcolwidths = [None, 80]
+
+    return tabulate(
+        table_data, headers=headers, tablefmt=tablefmt, maxcolwidths=maxcolwidths
+    )

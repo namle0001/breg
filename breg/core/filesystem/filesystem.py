@@ -1,11 +1,22 @@
+"""Filesystem abstraction module."""
+
 from pathlib import Path
 from typing import IO, Any
 
 
 class Filesystem:
+    """A simple filesystem abstraction that manages a base path and provides methods
+    to work with files relative to that base path.
+    """
+
     _base_path: Path
 
     def __init__(self, base_path: Path = Path.cwd()):
+        """Initialize the Filesystem with a base path.
+
+        Args:
+            base_path (Path, optional): The base path for the filesystem. Defaults to the current working directory.
+        """
         self._base_path = base_path.resolve()
 
     def set_base(self, base_path: Path) -> None:

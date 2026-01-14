@@ -1,3 +1,5 @@
+"""Bootstrap module for the application."""
+
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -8,6 +10,11 @@ from breg.bootstrap.interactive_console import (
 
 
 def bootstrap():
+    """Bootstrap the application based on command-line arguments.
+
+    Raises:
+        ValueError: If no valid user interface option is provided.
+    """
     parser = ArgumentParser()
     parser.add_argument(
         "-d", "--project-dir", required=True, help="Path to the project directory"
